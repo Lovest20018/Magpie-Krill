@@ -1,0 +1,9 @@
+node_modules/
+*.tgz
+*.tgz.sha256
+release/
+.env
+.env.*
+plugin-auth.json
+.sandbox/
+coverage/

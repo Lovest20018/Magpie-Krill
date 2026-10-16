@@ -1,0 +1,50 @@
+name: Release plugin
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Verify version tag
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import { readFileSync } from 'node:fs';
+          const pkg = JSON.parse(readFileSync('package.json', 'utf8'));
+          assert.equal(process.env.GITHUB_REF_NAME, `v${pkg.version}`);
+          JS
+      - name: Check source and plugin contract
+        run: npm run check
+      - name: Run synthetic service tests
+        run: npm test
+      - name: Check release contents
+        run: npm run release:check
+      - name: Build package and checksum
+        run: |
+          mkdir -p release
+          npm pack --ignore-scripts --json --pack-destination release > release/manifest.json
+          node --input-type=module <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs';
+          import { createHash } from 'node:crypto';
+          const [pack] = JSON.parse(readFileSync('release/manifest.json', 'utf8'));
+          const digest = createHash('sha256').update(readFileSync(`release/${pack.filename}`)).digest('hex');
+          writeFileSync(`release/${pack.filename}.sha256`, `${digest}  ${pack.filename}\n`);
+          JS
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" release/*.tgz release/*.sha256 \
+            --verify-tag --title "Krill for Magpie $GITHUB_REF_NAME" --notes-file RELEASE.md

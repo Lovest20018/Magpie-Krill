@@ -1,0 +1,32 @@
+Krill Usage for Magpie
+Copyright (c) 2026 Krill Usage for Magpie contributors
+
+This project is an independently authored Magpie provider plugin, licensed
+under MIT. It implements the documented Magpie plugin hooks, Krill's public
+login and model interfaces, and the subscription response fields observed
+in the following references:
+
+  Magpie plugin documentation and host implementation
+  https://usemagpie.ai/docs/zh/plugins
+  https://github.com/yetone/magpie
+
+  Krill public website, login page, model metadata and setup guide
+  https://www.krill-code.com
+
+  Krill-Usage by MAOHENG LENG (lengmh) and contributors
+  https://github.com/lengmh/Krill-Usage
+  Reference repository's current license: GPL-3.0-only
+
+No implementation source, assets, native credential helpers, VS Code
+extension, or Codex plugin from Krill-Usage are included in this package.
+
+Krill and Magpie names are used only to identify the services this plugin
+supports. This project is not endorsed by or affiliated with Krill.
+
+Official Krill icon (assets/krill.png and the identical embedded PNG):
+  Source: https://www.krill-code.com/brand/icon-160.png
+  Retrieved: 2026-10-15, unchanged 160 x 160 PNG
+  SHA-256: aed8714a8a483c177c492b3949c23c52acc5505eb98684802c022716c71e272a
+This third-party brand asset remains the property of its respective owner
+and is not covered by this project's MIT license. It identifies the Krill
+service; its inclusion does not imply endorsement.
