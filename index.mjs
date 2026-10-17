@@ -7,7 +7,7 @@ import { websiteToken } from "./src/routes.mjs";
 import { createModelFetcher } from "./src/models.mjs";
 import { inferenceLoader } from "./src/inference.mjs";
 
-const PROVIDER = "krill-usage";
+const PROVIDER = "krill";
 
 // Export only the plugin function: Magpie treats every exported function
 // in the entry module as a plugin. Helpers live in src/ instead.

@@ -3,14 +3,16 @@ import test from "node:test";
 import { KrillUsagePlugin } from "../index.mjs";
 import { TOKEN_A, TOKEN_B, payload, subscription, jsonResponse } from "./fixtures.mjs";
 
-test("registers the quota provider without overriding user config or exposing models", async () => {
+test("registers the Krill provider without overriding user config or exposing unauthenticated models", async () => {
   const hooks = await KrillUsagePlugin({});
   const config = {};
   await hooks.config(config);
-  assert.equal(hooks.auth.provider, "krill-usage");
+  assert.equal(hooks.auth.provider, "krill");
+  assert.equal(hooks.provider.id, "krill");
+  assert.deepEqual(Object.keys(config.provider), ["krill"]);
   assert.equal(config.provider[hooks.auth.provider].name, "Krill");
   assert.deepEqual(config.provider[hooks.auth.provider].models, {});
-  const userConfig = { provider: { "krill-usage": { name: "My Krill" } } };
+  const userConfig = { provider: { krill: { name: "My Krill" } } };
   await hooks.config(userConfig);
   assert.equal(userConfig.provider[hooks.auth.provider].name, "My Krill");
   assert.deepEqual(await hooks.provider.models({ models: { unexpected: {} } }), {});

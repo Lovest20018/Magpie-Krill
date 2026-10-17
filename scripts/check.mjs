@@ -23,7 +23,8 @@ const mod = await import(new URL(`../${pkg.main}`, import.meta.url));
 const plugins = Object.values(mod).filter((value) => typeof value === "function");
 assert.equal(plugins.length, 1, "The entry must export exactly one plugin function");
 const hooks = await plugins[0]({});
-assert.equal(hooks.auth.provider, "krill-usage");
+assert.equal(hooks.auth.provider, "krill");
+assert.equal(hooks.provider.id, "krill");
 assert.equal(typeof hooks.auth.loader, "function");
 assert.equal(typeof hooks.auth.usage, "function");
 assert.equal(hooks.auth.methods.length, 2);
@@ -35,6 +36,7 @@ assert.deepEqual(hooks.auth.methods[0].prompts.map((prompt) => prompt.key), ["em
 assert.deepEqual(hooks.auth.methods[1].prompts.map((prompt) => prompt.key), ["modelKey", "route"]);
 const config = {};
 await hooks.config(config);
+assert.deepEqual(Object.keys(config.provider), ["krill"]);
 assert.deepEqual(config.provider[hooks.auth.provider].models, {});
 assert.deepEqual(await hooks.provider.models(), {});
 console.log("Syntax and Magpie provider plugin contract checks passed.");

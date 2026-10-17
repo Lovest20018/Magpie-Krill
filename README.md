@@ -1,6 +1,6 @@
 # Krill for Magpie
 
-在 Magpie 原生供应商界面接入 Krill，查看订阅额度并使用账号可用的模型。当前版本 **0.19.1**，供应商 ID 为 `krill-usage`。
+在 Magpie 原生供应商界面接入 Krill，查看订阅额度并使用账号可用的模型。最近发布版本 **0.19.1**，当前源码供应商 ID 为 `krill`，包名保持 `opencode-krill-usage`。
 
 这是非官方插件，与 Krill 或 Magpie 运营方没有隶属关系。模型权限、额度和最终计费以 Krill 服务端为准。
 
@@ -16,12 +16,14 @@ github:Lovest20018/Magpie-Krill
 
 ```sh
 magpie plugin add github:Lovest20018/Magpie-Krill
-magpie plugin login krill-usage
+magpie plugin login krill
 ```
 
-固定当前版本可使用 `github:Lovest20018/Magpie-Krill#v0.19.1`。使用默认分支安装可继续接收仓库更新；固定标签不会跟随新版本。
+固定已发布版本可使用 `github:Lovest20018/Magpie-Krill#v0.19.1`，该标签仍使用旧供应商 ID `krill-usage`。默认分支中的供应商 ID 调整尚未打标签发布；固定标签不会跟随更新。
 
 安装后，在「供应商 → 添加供应商」选择 Krill，完成连接，再获取模型、勾选所需模型并保存。登录表单位于供应商流程中。
+
+当前源码仅注册 `krill`，不迁移旧 `krill-usage` 连接或注册旧 ID 别名。从旧 ID 更新后需重新连接、获取并选择模型，模型标识为 `krill/模型ID`；原有 Agent 模型选择及路由中的旧引用需重新选择。插件不会自动删除旧连接。
 
 [GitHub Releases](https://github.com/Lovest20018/Magpie-Krill/releases) 同时提供 `.tgz` 安装包和 SHA256 校验文件。将包解压到固定目录，也可在 Magpie 添加其中的 `package` 目录。插件没有第三方运行依赖或安装脚本。
 

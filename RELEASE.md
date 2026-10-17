@@ -1,6 +1,8 @@
-# Krill for Magpie v0.19.1
+# Krill for Magpie · 当前源码说明
 
 通过 Magpie 原生供应商界面连接 Krill，查看订阅额度并使用账号可用模型。
+
+最近发布版本为 v0.19.1。当前源码供应商 ID 为 `krill`，该调整尚未打标签发布。
 
 ## 当前功能
 
@@ -17,17 +19,19 @@
 
 ## 安装
 
-在 Magpie「插件 → 添加插件」输入：
+跟随当前源码时，在 Magpie「插件 → 添加插件」输入：
 
 ```text
-github:Lovest20018/Magpie-Krill#v0.19.1
+github:Lovest20018/Magpie-Krill
 ```
 
-需要跟随仓库更新时使用 `github:Lovest20018/Magpie-Krill`。
+固定已发布版本可使用 `github:Lovest20018/Magpie-Krill#v0.19.1`；该标签仍使用旧供应商 ID `krill-usage`，不会接收默认分支更新。
 
 也可下载 `.tgz` 和 `.sha256` 文件，核对校验值后解压到固定位置，在 Magpie 添加其中的 `package` 目录。
 
 安装后在「供应商 → 添加供应商 → Krill」连接账号，获取并选择模型。重新登录需要重填模型 Key；Key 留空只查询额度。网站登录过期不禁用独立模型 Key。
+
+当前源码不迁移旧 `krill-usage` 连接，也不注册旧 ID 别名。更新后需重新连接并获取模型，Agent 模型标识使用 `krill/模型ID`；旧模型选择及路由引用需重新选择。旧连接不会被插件删除。包名保持 `opencode-krill-usage`。
 
 ## 验证与边界
 
