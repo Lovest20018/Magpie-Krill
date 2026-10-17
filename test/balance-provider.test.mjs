@@ -37,14 +37,14 @@ test("one website login serves both providers and balance linking requires only 
   let calls = 0;
   t.mock.method(globalThis, "fetch", async url => { calls++; return jsonResponse(url.endsWith("/models") ? catalog : envelope({ token: TOKEN_A, user: { email: inputs.email, id: 7 } })); });
   const balance = await KrillBalancePlugin({}), subscription = await KrillUsagePlugin({});
-  assert.equal(balance.auth.methods.some(method => method.prompts.some(prompt => prompt.key === "password")), false);
+  assert.equal(balance.auth.methods[0].label, subscription.auth.methods[0].label);
   const required = balance.auth.methods[0].prompts.find(p => p.key === "modelKey");
   assert.ok(required.validate(""));
   assert.equal(subscription.auth.methods[0].prompts.find(p => p.key === "modelKey").validate(""), undefined);
   const fail = await (await balance.auth.methods[0].authorize({ ...inputs, modelKey: "" })).callback();
   assert.equal(fail.type, "failed");
   assert.equal(calls, 0);
-  const website = await (await subscription.auth.methods[0].authorize({ ...inputs, modelKey: "" })).callback();
+  const website = await (await subscription.auth.methods[0].authorize({ ...inputs, websiteAccount: "new-account", modelKey: "" })).callback();
   const websiteAccount = websiteAccounts.observe({ ...website, type: "oauth" });
   const saved = await (await balance.auth.methods[0].authorize({ modelKey: key, route: "direct", websiteAccount })).callback();
   assert.equal(saved.type, "success");
@@ -60,7 +60,7 @@ test("multiple Keys and routes of the same email stay distinct; switching login 
   t.mock.method(globalThis, "fetch", async url => jsonResponse(url.endsWith("/models") ? catalog : envelope({ token: TOKEN_A, user: { email: inputs.email, id: 7 } })));
   const hooks = await KrillBalancePlugin({});
   const primary = await KrillUsagePlugin({});
-  const website = await (await primary.auth.methods[0].authorize({ ...inputs, modelKey: "" })).callback();
+  const website = await (await primary.auth.methods[0].authorize({ ...inputs, websiteAccount: "new-account", modelKey: "" })).callback();
   const websiteAccount = websiteAccounts.observe({ ...website, type: "oauth" });
   const login = async (method, changes = {}) => (await hooks.auth.methods[method].authorize({ modelKey: key, route: "direct", websiteAccount, ...changes })).callback();
   const web = await login(0), standalone = await login(1);
@@ -79,7 +79,7 @@ test("TOTP is completed once in the shared website login and is not requested ag
     return jsonResponse(envelope(url.endsWith("/totp") ? { token: TOKEN_A, user: { email: inputs.email } } : { requires_totp: true, pending_token: "synthetic-pending" }));
   });
   const primary = await KrillUsagePlugin({});
-  const flow = await primary.auth.methods[0].authorize({ ...inputs, modelKey: "" });
+  const flow = await primary.auth.methods[0].authorize({ ...inputs, websiteAccount: "new-account", modelKey: "" });
   assert.equal(flow.method, "code");
   const website = await flow.callback("123456");
   const websiteAccount = websiteAccounts.observe({ ...website, type: "oauth" });

@@ -34,8 +34,8 @@ for (const plugin of plugins) {
     assert.equal(method.type, "oauth");
     assert.equal(typeof method.authorize, "function");
   }
-  assert.deepEqual(hooks.auth.methods[0].prompts.map(prompt => prompt.key), hooks.auth.provider === "krill"
-    ? ["email", "password", "modelKey", "route"] : ["websiteAccount", "modelKey", "route"]);
+  assert.deepEqual(hooks.auth.methods[0].prompts.map(prompt => prompt.key), ["websiteAccount", "email", "password", "modelKey", "route"]);
+  assert.equal(hooks.auth.methods[0].prompts.find(prompt => prompt.key === "email").condition({}), true);
   assert.deepEqual(hooks.auth.methods[1].prompts.map(prompt => prompt.key), ["modelKey", "route"]);
   const config = {};
   await hooks.config(config);

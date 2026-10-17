@@ -1,17 +1,18 @@
 import { requestJSON, unwrap } from "./http.mjs";
 import { UsageError } from "./errors.mjs";
 import { modelLoginPrompts, modelCredentials, finishLogin, safeLoginMessage } from "./login-result.mjs";
+import { verifyModelKey } from "./key-login.mjs";
 
 const WEBSITE = "https://www.krill-code.com";
 
-export function passwordLoginMethod(timeoutMs, { onLogin } = {}) {
+export function passwordLoginMethod(timeoutMs, { balance = false, onLogin } = {}) {
   return {
     type: "oauth",
     label: "邮箱密码登录",
     prompts: [
       { type: "text", key: "email", message: "Krill 账号邮箱", placeholder: "在 Krill 注册的邮箱", validate: (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value?.trim() ?? "") ? undefined : "请输入有效的账号邮箱。" },
       { type: "password", key: "password", message: "Krill 网站密码", placeholder: "仅用于本次登录，不保存", validate: (value) => typeof value === "string" && value.length > 0 ? undefined : "请输入 Krill 网站密码。" },
-      ...modelLoginPrompts(),
+      ...modelLoginPrompts({ balance }),
     ],
     async authorize(inputs = {}) {
       let response;
@@ -23,7 +24,8 @@ export function passwordLoginMethod(timeoutMs, { onLogin } = {}) {
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email ?? "") || typeof inputs.password !== "string" || !inputs.password) {
           throw new UsageError("LOGIN_INPUT", "请输入有效的邮箱和登录密码。");
         }
-        ({ modelKey, route } = modelCredentials(inputs));
+        ({ modelKey, route } = modelCredentials(inputs, { balance }));
+        if (balance) await verifyModelKey({ modelKey, route }, timeoutMs);
         response = unwrap(await requestJSON(`${WEBSITE}/api/auth/login`, {
           body: { email, password: inputs.password }, timeoutMs, authKind: "login",
         }));
@@ -36,7 +38,7 @@ export function passwordLoginMethod(timeoutMs, { onLogin } = {}) {
       if (loginError) return { url: "", method: "auto", callback: async () => ({ type: "failed", error: loginError }) };
       const pending = response?.requires_totp === true ? response.pending_token : undefined;
       const finish = (data) => {
-        const result = finishLogin(data, { modelKey, route });
+        const result = finishLogin(data, { modelKey, route }, { balance });
         return result.type === "success" && onLogin ? onLogin(result) : result;
       };
       if (response?.requires_totp === true) {

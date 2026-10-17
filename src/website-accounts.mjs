@@ -50,17 +50,17 @@ export function createWebsiteAccounts({ now = Date.now } = {}) {
   return {
     options,
     observe,
-    signedIn(result) {
+    signedIn(result, provider = "krill") {
       if (result?.type !== "success") return result;
       const id = identity(result);
       const websiteSignedInAt = Math.max(now(), (accounts.get(id)?.signedInAt ?? 0) + 1);
       const saved = { ...result, websiteSignedInAt };
-      observe({ ...saved, type: "oauth" });
+      observe({ ...saved, type: "oauth" }, provider);
       return saved;
     },
     select(id) {
       const session = accounts.get(id);
-      if (!session || session.expired) throw new UsageError("WEBSITE_ACCOUNT", "请先在「Krill · 套餐」使用邮箱密码登录 Krill 账号，再到这里选择该账号。已有连接可先刷新供应商列表。");
+      if (!session || session.expired) throw new UsageError("WEBSITE_ACCOUNT", "所选 Krill 官网账号不可用，请重新选择或使用邮箱密码登录。已有连接可先刷新供应商列表。");
       return { access: session.access, email: session.email, ...(session.uid ? { uid: session.uid } : {}), websiteSignedInAt: session.signedInAt };
     },
     async resolve(auth, { provider, save } = {}) {

@@ -88,8 +88,10 @@ for (const plugin of Object.values(entry)) {
   assert.equal(typeof hooks.provider.models, "function");
   assert.equal(typeof hooks.config, "function");
   assert.equal(hooks.auth.methods.length, 2, "Each provider has account sign-in/reuse and standalone Key connection.");
-  assert.equal(hooks.auth.methods.some(method => method.prompts.some(prompt => prompt.key === "password")), hooks.auth.provider === "krill",
-    "Only krill may ask for the shared website password.");
+  assert.deepEqual(hooks.auth.methods[0].prompts.map(prompt => prompt.key), ["websiteAccount", "email", "password", "modelKey", "route"],
+    "Both providers must support website sign-in and reuse, regardless of which is opened first.");
+  assert.deepEqual(hooks.auth.methods[1].prompts.map(prompt => prompt.key), ["modelKey", "route"],
+    "Standalone model connections must not ask for website credentials.");
 }
 assert.deepEqual(providers.sort(), ["krill", "krill-balance"]);
 

@@ -36,7 +36,7 @@ export function keyLoginMethod(timeoutMs, { balance = false } = {}) {
       } catch (error) { result = { type: "failed", error: safeLoginMessage(error) }; }
       return {
         url: "", method: "auto",
-        instructions: balance ? "使用所选线路核验模型 Key。需要官网统计时，选择「使用已登录的 Krill 账号」。" : "使用所选线路核验模型 Key。未连接官网统计；可通过邮箱密码登录连接官网统计。",
+        instructions: "使用所选线路核验模型 Key。需要官网统计时，选择「邮箱密码登录 / 使用已登录账号」。",
         callback: async () => result,
       };
     },

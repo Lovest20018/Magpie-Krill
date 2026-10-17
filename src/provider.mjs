@@ -1,5 +1,4 @@
 import { UsageError } from "./errors.mjs";
-import { passwordLoginMethod } from "./login.mjs";
 import { keyLoginMethod } from "./key-login.mjs";
 import { websiteToken } from "./routes.mjs";
 import { createModelFetcher } from "./models.mjs";
@@ -20,9 +19,7 @@ export async function createProvider(id, options = {}, input = {}) {
   const maxConcurrency = options?.maxConcurrency;
   if (maxConcurrency !== undefined && (!Number.isInteger(maxConcurrency) || maxConcurrency < 1 || maxConcurrency > 1000)) throw new Error("Krill Usage：maxConcurrency 必须是 1–1000 之间的整数。");
   const fetchModels = createModelFetcher({ timeoutMs, balance });
-  const siteLogin = balance ? linkedLoginMethod(timeoutMs, websiteAccounts)
-    : passwordLoginMethod(timeoutMs, { onLogin: result => websiteAccounts.signedIn(result) });
-  if (!balance) siteLogin.label = "邮箱密码登录（套餐、余额共用）";
+  const siteLogin = linkedLoginMethod(timeoutMs, websiteAccounts, { balance });
   const save = async auth => {
     try {
       if (typeof input?.client?.auth?.set === "function") await input.client.auth.set({ path: { id }, body: auth });
