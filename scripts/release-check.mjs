@@ -43,8 +43,8 @@ try {
 
 const documents = new Set(["package.json", "index.mjs", "README.md", "PRIVACY.md", "RELEASE.md", "LICENSE", "NOTICE"]);
 const runtime = new Set([
-  "api", "errors", "http", "inference", "key-login", "login", "login-result",
-  "model-capabilities", "model-errors", "models", "pricing", "routes", "token", "usage",
+  "api", "errors", "http", "inference", "key-login", "linked-login", "login", "login-result",
+  "model-capabilities", "model-errors", "models", "pricing", "provider", "routes", "site-data", "token", "usage", "website-accounts",
 ].map(name => `src/${name}.mjs`));
 const paths = new Set();
 for (const file of manifest.files) {
@@ -76,16 +76,22 @@ assert.deepEqual(Buffer.from(pkg.magpie.icon.split(",")[1], "base64"), icon,
   "The packaged icon metadata must match assets/krill.png.");
 
 const entry = await import(pathToFileURL(join(root, "index.mjs")));
-assert.equal(Object.keys(entry).length, 1, "The entry must expose exactly one plugin export.");
-assert.equal(typeof Object.values(entry)[0], "function");
-const hooks = await Object.values(entry)[0]({});
-assert.equal(hooks.auth.provider, "krill");
-assert.equal(hooks.provider.id, "krill");
-assert.equal(typeof hooks.auth.loader, "function");
-assert.equal(typeof hooks.auth.usage, "function");
-assert.equal(typeof hooks.provider.models, "function");
-assert.equal(typeof hooks.config, "function");
-assert.equal(hooks.auth.methods.length, 2, "Only password/TOTP and API key sign-in belong in the release.");
+assert.equal(Object.keys(entry).length, 2, "The entry must expose exactly two provider plugin exports.");
+const providers = [];
+for (const plugin of Object.values(entry)) {
+  assert.equal(typeof plugin, "function");
+  const hooks = await plugin({});
+  providers.push(hooks.auth.provider);
+  assert.equal(hooks.provider.id, hooks.auth.provider);
+  assert.equal(typeof hooks.auth.loader, "function");
+  assert.equal(typeof hooks.auth.usage, "function");
+  assert.equal(typeof hooks.provider.models, "function");
+  assert.equal(typeof hooks.config, "function");
+  assert.equal(hooks.auth.methods.length, 2, "Each provider has account sign-in/reuse and standalone Key connection.");
+  assert.equal(hooks.auth.methods.some(method => method.prompts.some(prompt => prompt.key === "password")), hooks.auth.provider === "krill",
+    "Only krill may ask for the shared website password.");
+}
+assert.deepEqual(providers.sort(), ["krill", "krill-balance"]);
 
 assert.equal(pkg.repository?.url, "git+https://github.com/Lovest20018/Magpie-Krill.git");
-console.log(`Release boundary passed: ${pkg.name}@${pkg.version}, ${paths.size} packed files, one plugin export, no runtime dependencies. No credentials or live service were used.`);
+console.log(`Release boundary passed: ${pkg.name}@${pkg.version}, ${paths.size} packed files, two provider exports, no runtime dependencies. No credentials or live service were used.`);

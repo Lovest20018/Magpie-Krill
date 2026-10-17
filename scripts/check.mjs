@@ -21,22 +21,28 @@ checkDirectory(root);
 const pkg = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const mod = await import(new URL(`../${pkg.main}`, import.meta.url));
 const plugins = Object.values(mod).filter((value) => typeof value === "function");
-assert.equal(plugins.length, 1, "The entry must export exactly one plugin function");
-const hooks = await plugins[0]({});
-assert.equal(hooks.auth.provider, "krill");
-assert.equal(hooks.provider.id, "krill");
-assert.equal(typeof hooks.auth.loader, "function");
-assert.equal(typeof hooks.auth.usage, "function");
-assert.equal(hooks.auth.methods.length, 2);
-for (const method of hooks.auth.methods) {
-  assert.equal(method.type, "oauth");
-  assert.equal(typeof method.authorize, "function");
+assert.equal(plugins.length, 2, "The entry must export exactly two provider plugin functions");
+const seen = [];
+for (const plugin of plugins) {
+  const hooks = await plugin({});
+  seen.push(hooks.auth.provider);
+  assert.equal(hooks.provider.id, hooks.auth.provider);
+  assert.equal(typeof hooks.auth.loader, "function");
+  assert.equal(typeof hooks.auth.usage, "function");
+  assert.equal(hooks.auth.methods.length, 2);
+  for (const method of hooks.auth.methods) {
+    assert.equal(method.type, "oauth");
+    assert.equal(typeof method.authorize, "function");
+  }
+  assert.deepEqual(hooks.auth.methods[0].prompts.map(prompt => prompt.key), hooks.auth.provider === "krill"
+    ? ["email", "password", "modelKey", "route"] : ["websiteAccount", "modelKey", "route"]);
+  assert.deepEqual(hooks.auth.methods[1].prompts.map(prompt => prompt.key), ["modelKey", "route"]);
+  const config = {};
+  await hooks.config(config);
+  assert.deepEqual(Object.keys(config.provider), [hooks.auth.provider]);
+  assert.equal(config.provider[hooks.auth.provider].name, hooks.auth.provider === "krill" ? "Krill · 套餐" : "Krill · 余额");
+  assert.deepEqual(config.provider[hooks.auth.provider].models, {});
+  assert.deepEqual(await hooks.provider.models(), {});
 }
-assert.deepEqual(hooks.auth.methods[0].prompts.map((prompt) => prompt.key), ["email", "password", "modelKey", "route"]);
-assert.deepEqual(hooks.auth.methods[1].prompts.map((prompt) => prompt.key), ["modelKey", "route"]);
-const config = {};
-await hooks.config(config);
-assert.deepEqual(Object.keys(config.provider), ["krill"]);
-assert.deepEqual(config.provider[hooks.auth.provider].models, {});
-assert.deepEqual(await hooks.provider.models(), {});
+assert.deepEqual(seen.sort(), ["krill", "krill-balance"]);
 console.log("Syntax and Magpie provider plugin contract checks passed.");

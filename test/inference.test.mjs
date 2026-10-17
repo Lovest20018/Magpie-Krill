@@ -49,6 +49,44 @@ test("rejects other hosts, routes and website endpoints before network access", 
   assert.equal(requests, 0);
 });
 
+test("balance transparently forwards host image generation and multipart edits using only its model Key", async t => {
+  const seen = [];
+  const replies = [];
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    seen.push({ url: String(url), init });
+    const response = Response.json({ data: [{ b64_json: "c3ludGhldGlj" }] });
+    replies.push(response);
+    return response;
+  });
+  const loader = inferenceLoader(async () => auth, { balance: true });
+  const body = JSON.stringify({ model: "gpt-image-2", prompt: "synthetic", size: "1024x1024" });
+  const generated = await loader.fetch(`${base}/images/generations`, { method: "POST", body, headers: { authorization: `Bearer ${TOKEN_A}`, "x-api-key": TOKEN_A, cookie: "synthetic-cookie", "content-type": "application/json" } });
+  assert.equal(seen[0].init.body, body);
+  assert.equal(generated, replies[0]);
+  const edits = new FormData();
+  edits.set("model", "gpt-image-2");
+  edits.set("image", new Blob(["synthetic-image"], { type: "image/png" }), "synthetic.png");
+  const controller = new AbortController();
+  const request = new Request(`${base}/images/edits`, { method: "POST", body: edits, signal: controller.signal });
+  const edited = await loader.fetch(request);
+  assert.equal(edited, replies[1]);
+  assert.equal(seen[1].init.body, request.body);
+  assert.equal(seen[1].init.signal, request.signal);
+  assert.match(seen[1].init.headers.get("content-type"), /^multipart\/form-data; boundary=/);
+  for (const call of seen) {
+    assert.equal(call.init.headers.get("authorization"), `Bearer ${modelKey}`);
+    assert.equal(call.init.headers.get("x-api-key"), null);
+    assert.equal(call.init.headers.get("cookie"), null);
+    assert.equal(call.init.redirect, "manual");
+    assert.equal(JSON.stringify([...call.init.headers]).includes(TOKEN_A), false);
+  }
+  await assert.rejects(inferenceLoader(async () => auth).fetch(`${base}/images/generations`), { code: "MODEL_DESTINATION" });
+  for (const url of ["https://other.example/v1/images/generations", "https://www.krill-code.com/api/draw", "https://api.krill-code.net/v1/images/edits/extra", "https://api.krill-code.net/v1/files"]) {
+    await assert.rejects(loader.fetch(url), { code: "MODEL_DESTINATION" });
+  }
+  assert.equal(seen.length, 2);
+});
+
 test("a rejected model key keeps website login and returns a safe API error", async (t) => {
   t.mock.method(globalThis, "fetch", async () => new Response(`${TOKEN_A} ${modelKey}`, { status: 401 }));
   const response = await inferenceLoader(async () => auth).fetch(`${base}/responses`);

@@ -10,7 +10,7 @@ test("registers the Krill provider without overriding user config or exposing un
   assert.equal(hooks.auth.provider, "krill");
   assert.equal(hooks.provider.id, "krill");
   assert.deepEqual(Object.keys(config.provider), ["krill"]);
-  assert.equal(config.provider[hooks.auth.provider].name, "Krill");
+  assert.equal(config.provider[hooks.auth.provider].name, "Krill · 套餐");
   assert.deepEqual(config.provider[hooks.auth.provider].models, {});
   const userConfig = { provider: { krill: { name: "My Krill" } } };
   await hooks.config(userConfig);
@@ -30,8 +30,9 @@ test("never sends a model request, even if the provider is accidentally selected
 
 test("uses the latest auth on each refresh and keeps concurrent accounts separate", async (t) => {
   const seen = [];
-  t.mock.method(globalThis, "fetch", async (_url, init) => {
+  t.mock.method(globalThis, "fetch", async (url, init) => {
     seen.push(init.headers.authorization);
+    if (url.endsWith("/credits")) return jsonResponse({ success: true, code: 0, data: { balance_usd: init.headers.authorization === `Bearer ${TOKEN_A}` ? "12" : "34" } });
     return init.headers.authorization === `Bearer ${TOKEN_A}`
       ? jsonResponse(payload([subscription({ name: "账号 A", remaining: "240" })], "12"))
       : jsonResponse(payload([subscription({ name: "账号 B", remaining: "300" })], "34"));
@@ -41,17 +42,17 @@ test("uses the latest auth on each refresh and keeps concurrent accounts separat
   const getB = async () => ({ type: "api", key: TOKEN_B });
   const [a, b] = await Promise.all([hooks.auth.usage(getA), hooks.auth.usage(getB)]);
   assert.equal(a.plan, "账号 A");
-  assert.equal(a.balance, "$12.00");
+  assert.equal(a.balance, "$12.00（账号共享）");
   assert.equal(a.windows[0].used, 60);
   assert.equal(b.plan, "账号 B");
-  assert.equal(b.balance, "$34.00");
+  assert.equal(b.balance, "$34.00（账号共享）");
   assert.equal(b.windows[0].used, 50);
   let current = TOKEN_A;
   const getCurrent = async () => ({ type: "api", key: current });
   assert.equal((await hooks.auth.usage(getCurrent)).plan, "账号 A");
   current = TOKEN_B;
   assert.equal((await hooks.auth.usage(getCurrent)).plan, "账号 B");
-  assert.deepEqual(seen, [TOKEN_A, TOKEN_B, TOKEN_A, TOKEN_B].map((token) => `Bearer ${token}`));
+  assert.deepEqual(seen, [TOKEN_A, TOKEN_A, TOKEN_B, TOKEN_B, TOKEN_A, TOKEN_A, TOKEN_B, TOKEN_B].map((token) => `Bearer ${token}`));
 });
 
 test("a failed refresh returns an explicit error and no cached allowance", async (t) => {
@@ -83,11 +84,13 @@ test("missing auth and rejected JWT tell Magpie to request login again", async (
   }
 });
 
-test("a malformed active quota produces an error, not an unused quota window", async (t) => {
+test("a malformed active quota keeps the fresh wallet and warns without an unused quota window", async (t) => {
   t.mock.method(globalThis, "fetch", async () => jsonResponse(payload([subscription({ remaining: null })])));
   const hooks = await KrillUsagePlugin({});
   const result = await hooks.auth.usage(async () => ({ type: "api", key: TOKEN_A }));
-  assert.ok(result.error.includes("不完整"));
+  assert.equal(result.error, undefined);
+  assert.match(result.plan, /不完整/);
+  assert.match(result.balance, /123.45/);
   assert.equal(result.signIn, "kept");
   assert.deepEqual(result.windows, []);
 });
@@ -95,7 +98,7 @@ test("a malformed active quota produces an error, not an unused quota window", a
 test("unexpected auth errors do not expose credential contents", async () => {
   const hooks = await KrillUsagePlugin({});
   const result = await hooks.auth.usage(async () => { throw new Error(TOKEN_A); });
-  assert.equal(result.error, "Krill 额度查询失败，请稍后重试。");
+  assert.equal(result.error, "Krill 官网查询失败，请稍后重试。");
   assert.ok(!JSON.stringify(result).includes(TOKEN_A));
 });
 
@@ -123,7 +126,7 @@ test("website JWT expiry cannot disable independent model credentials", async (t
   for (const access of [TOKEN_A, undefined, "invalid token"]) {
     const result = await hooks.auth.usage(async () => ({ type: "oauth", access, modelKey: "sk-synthetic-model-key" }));
     assert.equal(result.signIn, "kept");
-    assert.match(result.error, /额度登录已失效/);
+    assert.match(result.error, /官网登录已失效/);
     assert.match(result.error, /模型 Key 仍可使用/);
     assert.deepEqual(result.windows, []);
     assert.equal(result.balance, undefined);
@@ -141,7 +144,7 @@ test("OAuth accounts without a model key can read quota without requesting model
   assert.deepEqual(await hooks.provider.models(null, { auth }), {});
   const loader = await hooks.auth.loader(async () => auth);
   await assert.rejects(loader.fetch("https://api-slb.krill-code.net/v1/responses"), { code: "QUOTA_ONLY" });
-  assert.deepEqual(requests, ["https://www.krill-code.com/api/subscription"]);
+  assert.deepEqual(requests, ["https://www.krill-code.com/api/credits", "https://www.krill-code.com/api/subscription"]);
 });
 
 test("the usage hook forwards weekly and total limits for existing website accounts without another login", async (t) => {
@@ -156,7 +159,7 @@ test("the usage hook forwards weekly and total limits for existing website accou
     assert.deepEqual(usage.windows.map((window) => window.name), ["月卡 · 本周", "月卡 · 套餐总额"]);
     assert.equal(usage.error, undefined);
   }
-  assert.deepEqual(calls, ["https://www.krill-code.com/api/subscription", "https://www.krill-code.com/api/subscription"]);
+  assert.deepEqual(calls, ["https://www.krill-code.com/api/credits", "https://www.krill-code.com/api/subscription", "https://www.krill-code.com/api/credits", "https://www.krill-code.com/api/subscription"]);
 });
 
 test("an upgraded account can query quota, discover models and stream inference without a credential write or account-management request", async t => {
@@ -165,6 +168,7 @@ test("an upgraded account can query quota, discover models and stream inference 
   const hooks = await KrillUsagePlugin({ client: new Proxy({}, { get() { throw new Error("The plugin must not use account-management APIs"); } }) });
   t.mock.method(globalThis, "fetch", async (url, init) => {
     url = String(url); calls.push(url);
+    if (url === "https://www.krill-code.com/api/credits") return jsonResponse({ success: true, code: 0, data: { balance_usd: "123.45" } });
     if (url === "https://www.krill-code.com/api/subscription") {
       assert.equal(init.headers.authorization, `Bearer ${TOKEN_A}`);
       return jsonResponse(payload());
@@ -189,6 +193,6 @@ test("an upgraded account can query quota, discover models and stream inference 
   const loader = await hooks.auth.loader(async () => auth);
   const response = await loader.fetch("https://api.krill-code.net/v1/responses", { method: "POST", body: JSON.stringify({ model: "gpt-6.1-sol", service_tier: "ultrafast", stream: true }) });
   assert.match(await response.text(), /synthetic stream/);
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.deepEqual(auth, before);
 });

@@ -4,7 +4,7 @@ import { modelLoginPrompts, modelCredentials, finishLogin, safeLoginMessage } fr
 
 const WEBSITE = "https://www.krill-code.com";
 
-export function passwordLoginMethod(timeoutMs) {
+export function passwordLoginMethod(timeoutMs, { onLogin } = {}) {
   return {
     type: "oauth",
     label: "邮箱密码登录",
@@ -35,7 +35,10 @@ export function passwordLoginMethod(timeoutMs) {
       // key metadata. It is a credential exchange, not a browser OAuth flow.
       if (loginError) return { url: "", method: "auto", callback: async () => ({ type: "failed", error: loginError }) };
       const pending = response?.requires_totp === true ? response.pending_token : undefined;
-      const finish = (data) => finishLogin(data, { modelKey, route });
+      const finish = (data) => {
+        const result = finishLogin(data, { modelKey, route });
+        return result.type === "success" && onLogin ? onLogin(result) : result;
+      };
       if (response?.requires_totp === true) {
         if (typeof pending !== "string" || !pending) return { url: "", method: "auto", callback: async () => ({ type: "failed", error: "Krill 未返回有效的两步验证会话，请重新登录。" }) };
         return {

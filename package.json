@@ -1,7 +1,7 @@
 {
   "name": "opencode-krill-usage",
   "version": "0.19.1",
-  "description": "Krill provider plugin for Magpie: subscription allowances, model access, reasoning capabilities and public route pricing.",
+  "description": "Magpie Krill subscription and balance providers: shared website login, independent model Keys, inference, route prices and native quota/wallet summaries",
   "type": "module",
   "main": "./index.mjs",
   "exports": {

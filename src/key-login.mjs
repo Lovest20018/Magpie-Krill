@@ -1,12 +1,19 @@
-import { createHash } from "node:crypto";
 import { requestJSON } from "./http.mjs";
 import { UsageError } from "./errors.mjs";
-import { modelCredentials, modelLoginPrompts, safeLoginMessage } from "./login-result.mjs";
-import { normalizeModelKey, routeURL, ROUTES } from "./routes.mjs";
+import { modelAccountId, modelCredentials, modelLoginPrompts, safeLoginMessage } from "./login-result.mjs";
+import { normalizeModelKey, routeURL } from "./routes.mjs";
 import { catalogModels } from "./models.mjs";
 
-export function keyLoginMethod(timeoutMs) {
-  const prompts = modelLoginPrompts();
+export async function verifyModelKey({ modelKey, route }, timeoutMs) {
+  const base = routeURL(route);
+  const catalog = await requestJSON(`${base}/models`, {
+    headers: { authorization: `Bearer ${modelKey}` }, timeoutMs, authKind: "model",
+  });
+  catalogModels(catalog, [], base);
+}
+
+export function keyLoginMethod(timeoutMs, { balance = false } = {}) {
+  const prompts = modelLoginPrompts({ balance });
   prompts[0] = {
     ...prompts[0], message: "模型 API Key（必填）", placeholder: "不限前缀；填写已有的完整 Key",
     validate(value) { try { normalizeModelKey(value); } catch (error) { return error.message; } },
@@ -18,23 +25,18 @@ export function keyLoginMethod(timeoutMs) {
     async authorize(inputs = {}) {
       let result;
       try {
-        const { modelKey, route } = modelCredentials(inputs);
+        const { modelKey, route } = modelCredentials(inputs, { balance });
         if (!modelKey) throw new UsageError("LOGIN_INPUT", "请输入完整的 Krill 模型 API Key，不限制前缀。");
-        const base = routeURL(route);
-        const catalog = await requestJSON(`${base}/models`, {
-          headers: { authorization: `Bearer ${modelKey}` }, timeoutMs, authKind: "model",
-        });
-        catalogModels(catalog, [], base);
-        const fingerprint = createHash("sha256").update(modelKey).digest("hex").slice(0, 12);
+        await verifyModelKey({ modelKey, route }, timeoutMs);
         result = {
           type: "success", refresh: "", access: "", expires: 0,
           connection: "model-only", modelKey, route,
-          accountId: `Krill Key ${fingerprint} · ${ROUTES[route].label}`,
+          accountId: modelAccountId(modelKey, route),
         };
       } catch (error) { result = { type: "failed", error: safeLoginMessage(error) }; }
       return {
         url: "", method: "auto",
-        instructions: "使用所选线路核验模型 Key。此连接仅提供模型，不查询网站额度。",
+        instructions: balance ? "使用所选线路核验模型 Key。需要官网统计时，选择「使用已登录的 Krill 账号」。" : "使用所选线路核验模型 Key。未连接官网统计；可通过邮箱密码登录连接官网统计。",
         callback: async () => result,
       };
     },

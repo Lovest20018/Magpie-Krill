@@ -2,7 +2,7 @@ import { UsageError } from "./errors.mjs";
 import { normalizeModelKey, routeURL } from "./routes.mjs";
 import { modelErrorResponse } from "./model-errors.mjs";
 
-export function inferenceLoader(getAuth) {
+export function inferenceLoader(getAuth, { balance = false } = {}) {
   return {
     // Host fills an empty key with the account's website JWT. Use a
     // placeholder instead; the fetch below always selects the model key.
@@ -16,7 +16,9 @@ export function inferenceLoader(getAuth) {
       let url;
       try { url = new URL(input instanceof Request ? input.url : String(input)); }
       catch { throw new UsageError("MODEL_DESTINATION", "模型请求的地址无效，已停止发送。"); }
-      if (url.origin !== base.origin || url.username || url.password || !["/v1/messages", "/v1/responses", "/v1/chat/completions"].includes(url.pathname)) {
+      const allowed = ["/v1/messages", "/v1/responses", "/v1/chat/completions",
+        ...(balance ? ["/v1/images/generations", "/v1/images/edits"] : [])];
+      if (url.origin !== base.origin || url.username || url.password || !allowed.includes(url.pathname)) {
         throw new UsageError("MODEL_DESTINATION", "模型请求的地址不属于所选 Krill 线路，已停止发送。");
       }
       const inherited = input instanceof Request ? { method: input.method, body: input.body, signal: input.signal, duplex: "half" } : {};

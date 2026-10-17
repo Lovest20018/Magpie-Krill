@@ -14,9 +14,10 @@ export function krillSpeedBase(id) {
 }
 
 export function modelCapabilities(id, price) {
-  const documentedGPT = KRILL_GPT.test(id);
-  const classic = CLASSIC_REASONING.test(id);
-  const claude = CLAUDE_THINKING.test(id);
+  const nonText = typeof price?.model_type === "string" && price.model_type !== "" && price.model_type !== "text";
+  const documentedGPT = !nonText && KRILL_GPT.test(id);
+  const classic = !nonText && CLASSIC_REASONING.test(id);
+  const claude = !nonText && CLAUDE_THINKING.test(id);
   const levels = documentedGPT ? OPENAI_LEVELS : classic ? OPENAI_LEVELS.slice(0, 3) : [];
   const declared = typeof price?.modalities === "string" ? price.modalities.split(",").map((value) => value.trim().toLowerCase()) : [];
   return {
@@ -24,9 +25,11 @@ export function modelCapabilities(id, price) {
       reasoning: documentedGPT || classic || claude,
       // Krill publishes coding/tool examples for these families. Other
       // models can still chat, without an unsupported tool-call promise.
-      toolcall: documentedGPT || classic || /^claude[-.]/i.test(id),
+      toolcall: documentedGPT || classic || (!nonText && /^claude[-.]/i.test(id)),
       input: Object.fromEntries(MODALITIES.map((kind) => [kind, kind === "text" || declared.includes(kind)])),
-      output: { text: true },
+      // `modalities` describes accepted inputs; the explicit model type
+      // identifies image/video/audio output. Unknown types stay unknown.
+      output: nonText ? (MODALITIES.includes(price.model_type) ? { [price.model_type]: true } : {}) : { text: true },
     },
     variants: Object.fromEntries(levels.map((effort) => [effort, { reasoningEffort: effort }])),
   };

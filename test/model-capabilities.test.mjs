@@ -40,3 +40,14 @@ test("model modalities follow Krill metadata while unsupported tool capability r
   assert.equal(gemini.capabilities.toolcall, false);
   assert.deepEqual(model("unreported-model").capabilities.input, { text: true, image: false, audio: false, video: false, pdf: false });
 });
+
+test("media model output uses the declared type and does not inherit chat reasoning or token prices", () => {
+  const m = catalogModels({ data: [{ id: "gpt-image-2" }] }, [{ model_name: "gpt-image-2", model_type: "image", modalities: "text,image", billing_mode: "request", request_price_usd: "0.1" }], base, [], { balance: true })["gpt-image-2"];
+  assert.deepEqual(m.capabilities.output, { image: true });
+  assert.equal(m.capabilities.input.image, true);
+  assert.equal(m.capabilities.reasoning, false);
+  assert.equal(m.capabilities.toolcall, false);
+  assert.deepEqual(m.variants, {});
+  assert.equal(m.cost, undefined);
+  assert.equal(m.serviceTiers, undefined);
+});
