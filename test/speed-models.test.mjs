@@ -96,9 +96,10 @@ test("metadata refreshes update tier declarations while keeping the model catalo
   clock += 300_000; publicAvailable = false;
   const outage = await fetcher(auth);
   assert.deepEqual(calls, { models: 2, prices: 2 }); assert.equal(Object.keys(outage).length, 3);
-  assert.equal(outage[sol].fast, undefined);
-  assert.equal(outage[sol].serviceTiers, undefined);
+  assert.equal(outage[sol].fast, true);
+  assert.deepEqual(outage[sol].serviceTiers, ["priority", "ultrafast"]);
   assert.equal(outage[sol].cost, undefined);
+  assert.deepEqual(outage[sol].limit, { context: 0, output: 0 });
   publicAvailable = true; clock += 60_000;
   const restored = await fetcher(auth);
   assert.equal(Object.keys(restored).length, 3);
@@ -126,4 +127,96 @@ test("an Ultrafast-only price does not invent Fast support or extra model IDs", 
   assert.deepEqual(Object.keys(models), [sol]);
   assert.equal(models[sol].fast, false);
   assert.deepEqual(models[sol].serviceTiers, ["ultrafast"]);
+});
+
+test("a cold metadata outage keeps verified speed capabilities without inventing prices, permissions or unknown tiers", async t => {
+  const ids = [sol, astra, "gpt-6-sol", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna", "gpt-7-unknown", "codex-auto-review", `${sol}-fast`];
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.endsWith("/models")) return jsonResponse({ data: ids.map(id => ({ id })) });
+    throw new Error("Synthetic optional metadata outage");
+  });
+  const models = await createModelFetcher()(auth);
+  assert.deepEqual(Object.keys(models), ids);
+  for (const id of ids.slice(0, 6)) {
+    assert.deepEqual(models[id].serviceTiers, [sol, astra].includes(id) ? ["priority", "ultrafast"] : ["priority"]);
+    assert.equal(models[id].fast, true);
+    assert.equal(models[id].cost, undefined);
+    assert.deepEqual(models[id].limit, { context: 0, output: 0 });
+  }
+  for (const id of ids.slice(6)) assert.equal(models[id].serviceTiers, undefined);
+  assert.equal(models[`${astra}-ultrafast`], undefined);
+});
+
+test("a successful metadata read overrides verified defaults and later outages preserve disabled and missing tiers", async t => {
+  let clock = 1000, available = true;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.endsWith("/models")) return jsonResponse(catalog);
+    if (!available) throw new Error("Synthetic metadata outage after capability revocation");
+    return jsonResponse({ success: true, code: 0, data: [
+      price(sol), { ...price(`${sol}-fast`), enabled: false }, price(`${sol}-ultrafast`),
+      { ...price(astra), enabled: false }, price(`${astra}-fast`), price(`${astra}-ultrafast`),
+    ] });
+  });
+  const fetcher = createModelFetcher({ now: () => clock });
+  const initial = await fetcher(auth);
+  assert.deepEqual(initial[sol].serviceTiers, ["ultrafast"]);
+  assert.equal(initial[sol].fast, false);
+  assert.equal(initial[astra].serviceTiers, undefined);
+  available = false; clock += 300_000;
+  const outage = await fetcher(auth);
+  assert.deepEqual(outage[sol].serviceTiers, ["ultrafast"]);
+  assert.equal(outage[sol].fast, false);
+  assert.equal(outage[astra].serviceTiers, undefined);
+  assert.equal(outage[sol].cost, undefined);
+});
+
+test("successful empty metadata is authoritative and does not restore verified defaults on a later outage", async t => {
+  let clock = 1000, available = true;
+  t.mock.method(globalThis, "fetch", async url => {
+    if (url.endsWith("/models")) return jsonResponse(catalog);
+    if (!available) throw new Error("Synthetic metadata outage");
+    return jsonResponse({ success: true, code: 0, data: [] });
+  });
+  const fetcher = createModelFetcher({ now: () => clock });
+  assert.equal((await fetcher(auth))[sol].serviceTiers, undefined);
+  available = false; clock += 300_000;
+  assert.equal((await fetcher(auth))[sol].serviceTiers, undefined);
+});
+
+test("public metadata taking more than 1.5 seconds uses the configured request timeout", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let complete, metadataSignal;
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (url.endsWith("/models")) return jsonResponse(catalog);
+    metadataSignal = init.signal;
+    return new Promise((resolve, reject) => {
+      complete = resolve;
+      init.signal.addEventListener("abort", () => reject(new Error("Synthetic abort")), { once: true });
+    });
+  });
+  const pending = createModelFetcher({ timeoutMs: 12_000 })(auth);
+  t.mock.timers.tick(1_501);
+  assert.equal(metadataSignal.aborted, false);
+  complete(jsonResponse({ success: true, code: 0, data: prices }));
+  const models = await pending;
+  assert.deepEqual(models[sol].serviceTiers, ["priority", "ultrafast"]);
+  assert.deepEqual(models[sol].cost, { input: 0.4, output: 2 });
+});
+
+test("an actual metadata timeout aborts the request but leaves verified speed choices available", async t => {
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  let metadataSignal;
+  t.mock.method(globalThis, "fetch", async (url, init) => {
+    if (url.endsWith("/models")) return jsonResponse(catalog);
+    metadataSignal = init.signal;
+    return new Promise((resolve, reject) => {
+      init.signal.addEventListener("abort", () => reject(new Error("Synthetic abort")), { once: true });
+    });
+  });
+  const pending = createModelFetcher({ timeoutMs: 2_000 })(auth);
+  t.mock.timers.tick(2_000);
+  const models = await pending;
+  assert.equal(metadataSignal.aborted, true);
+  assert.deepEqual(models[sol].serviceTiers, ["priority", "ultrafast"]);
+  assert.equal(models[sol].cost, undefined);
 });

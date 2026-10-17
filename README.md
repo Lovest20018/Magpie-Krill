@@ -82,7 +82,15 @@ Claude 模型使用 Anthropic Messages，GPT/Codex/OpenAI 推理模型使用 Res
 
 速度与思考强度独立：Standard 使用默认速度，Fast 对应 `service_tier: "priority"`，Ultrafast 对应 `service_tier: "ultrafast"`。插件不默认开启加速档，也不从公开速度价格生成额外可调用模型。
 
-**原生速度入口需要 Magpie 与 Agent 支持。** 当前核对的正式版 Magpie v0.1.1268 尚未读取本插件的 `serviceTiers` 扩展声明，不能保证 Codex 出现 Fast/Ultrafast 按钮。插件可以转发实际收到的参数，但宿主是否保留参数及展示能力取决于其实现。
+速度能力与可选参考价格独立。首次公开元数据读取失败时，插件使用 2026-10-16 已核实的能力：`gpt-6.1-sol`、`gpt-6-astra` 提供 Fast/Ultrafast，`gpt-6-sol` 和三个 `gpt-5.6-*` 模型提供 Fast；仅适用于模型接口实际返回的基础 ID。成功读取的元数据优先，本次插件运行中之后读取失败时保留最近确认的能力，包括被禁用或移除的档位。该兜底不提供价格、上下文或最大输出，也不扩充未知模型的能力。
+
+**速度切换采用 Magpie 原生模型选择器提供的入口。** 插件声明模型支持的 `serviceTiers` 并转发收到的参数；宿主负责显示闪电开关和应用所选 `service_tier`，无需生成额外速度模型。上游已确认将为普通供应商插件补上该入口；截至已核对的 v0.1.1278 仍未开放，具体发布版本及完整请求流程待验收。
+
+Magpie v0.1.1269 起已将插件声明的档位写入 Codex 模型目录，并在 Chat/Responses 转换时保留支持的 `service_tier`，API 接入也包含该能力。对应模型的 `service_tiers` 为空时，检查宿主和插件版本、模型刷新以及公开元数据是否撤销了档位。目录声明与客户端按钮显示需分别核对。
+
+已核对的 Windows Codex 桌面版 `26.1013.3656.0` 还按登录类型限制速度 UI，普通 API Key 或空登录类型不会提供 Fast/Ultrafast。Magpie 闪电入口补齐后，速度由宿主在请求中应用，不依赖 Codex 桌面端显示按钮；这条完整链路仍需在正式宿主版本上验收。插件不改写 Codex 的 `auth.json` 或全局环境变量，不把第三方 Key 配置成 PAT 登录；该身份适配不在本项目计划内。
+
+路由分组不会因成员声明 `serviceTiers` 就自动向 Codex 提供相同档位，分组行为需单独核对；普通供应商模型的入口修复不代表分组已支持。
 
 ## 价格与缓存
 
@@ -100,7 +108,7 @@ Claude 模型使用 Anthropic Messages，GPT/Codex/OpenAI 推理模型使用 Res
 { "timeoutMs": 12000, "maxConcurrency": 4 }
 ```
 
-`timeoutMs` 为 1000–30000 毫秒，默认 12000；可选公开元数据最多等待 1.5 秒。推理使用 Magpie 的取消控制，不套用 JSON 查询超时。`maxConcurrency` 为 1–1000，仅在显式配置时声明；用户在宿主中的账号或供应商限制优先。
+`timeoutMs` 为 1000–30000 毫秒，默认 12000；公开元数据与其他 JSON 查询采用同一超时设置，失败后保留已核实的速度能力，价格保持未知。推理使用 Magpie 的取消控制，不套用 JSON 查询超时。`maxConcurrency` 为 1–1000，仅在显式配置时声明；用户在宿主中的账号或供应商限制优先。
 
 ## 开发与验证
 
