@@ -1,6 +1,6 @@
 # Krill for Magpie
 
-在 Magpie 原生供应商界面分别接入 **Krill · 套餐** 和 **Krill · 余额**，查询套餐额度、共享钱包及今日官网统计，调用当前 Key 可用的模型。最近发布版本 **0.19.1**；双供应商功能在当前源码中，尚未发布。包名保持 `opencode-krill-usage`，模型 Key 不限制前缀。
+在 Magpie 原生供应商界面分别接入 **Krill · 套餐** 和 **Krill · 余额**，查询套餐额度、共享钱包及今日官网统计，调用当前 Key 可用的模型。当前版本 **0.20.0**。包名保持 `opencode-krill-usage`，模型 Key 不限制前缀。
 
 这是非官方插件，与 Krill 或 Magpie 运营方没有隶属关系。模型权限、额度和最终计费以 Krill 服务端为准。
 
@@ -19,7 +19,7 @@ magpie plugin add github:Lovest20018/Magpie-Krill
 magpie plugin login krill
 ```
 
-固定已发布版本可使用 `github:Lovest20018/Magpie-Krill#v0.19.1`，该标签仍使用旧供应商 ID `krill-usage`。默认分支中的供应商 ID 调整尚未打标签发布；固定标签不会跟随更新。
+固定本版本可使用 `github:Lovest20018/Magpie-Krill#v0.20.0`；固定标签不会跟随默认分支更新。
 
 安装后，在「供应商 → 添加供应商」选择「Krill · 套餐」或「Krill · 余额」，完成连接，获取并勾选所需模型后保存。登录表单位于供应商流程中。
 
